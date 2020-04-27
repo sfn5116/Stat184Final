@@ -1,0 +1,174 @@
+---
+title: 'Final Project'
+author: "Srikar Nimmalapudi"
+date: "04/26/20"
+output:  html_notebook
+---
+
+# Final Project
+
+### Front Matter
+```{r}
+# clean up workspace environment
+rm(list = ls())
+```
+
+```{r}
+# all packages used for the assignment
+library(mosaic)
+library(tidyverse)  
+library(DataComputing)
+library(ggplot2)
+library(ggmap)
+library(leaflet)
+```
+
+## Introduction
+Guiding Question (i.e., Research Question):
+Can the use of the Boston crime dataset combined with the Boston firearm recovery dataset to analyze if the number of firearms recovered seems accurate when compared to the firearm related crimes in the first dataset.
+
+Dataset 1: Analyzing Crimes in Boston 
+
+I found this dataset on Kaggle. The source of this data are from crime incident reports that are provided by Boston Police Department (BPD). Data was initially collected in order to document the initial details surrounding an incident to which BPD officers respond. Records begin in June 14, 2015 and continue to September 3, 2018. A case represents a specific police case filed by a Boston Police officer on a specific citizen. It has 17 columns in total.
+
+Dataset 2: BPD FIREARM RECOVERY COUNTS
+
+This dataset was found from the same source as the other. All of this data is from the data.boston.gov website. This data contains 1231 entries and has the number of firearms confiscated by the BPD dating all the way back to 2014. 
+
+## Datasets loaded
+
+```{r}
+# Upload of the Boston Crime Data Set
+crimeData<- read.csv('https://data.boston.gov/dataset/6220d948-eae2-4e4b-8723-2dc8e67722a3/resource/12cb3883-56f5-47de-afa5-3b1cf61b257b/download/crime_incident_reports.csv', sep = ",", na.strings =c('','NA','na','N/A','n/a','NaN','nan'), strip.white = TRUE, stringsAsFactors = FALSE)
+```
+
+```{r}
+head(crimeData, 5)
+```
+```{r}
+# Upload of the BPD FIREARM RECOVERY COUNTS Data set
+firearmData<- read.csv('https://data.boston.gov/dataset/3937b427-6aa4-4515-b30d-c76771313feb/resource/a3d2260f-8a41-4e95-9134-d14711b0f954/download/bpdfirearmrecoveries20190624.csv', sep = ',')
+```
+```{r}
+head(firearmData)
+```
+
+
+## Analysis
+
+```{r}
+# This is an initial view of all of the crimes commited in Boston displayed geographically
+qplot(long, lat, data= crimeData, color=district, geom='point', xlim = c(-71.2,-70.95), ylim= c(42.23,42.4))  + theme_bw(base_size=10) + geom_point(size = 1)
+```
+I noticed that most of the values in the shooting column were marked as NA. After careful analysis, I found that the ones with a value were the ones where a shooting occured at the scene of the crime.
+```{r}
+# filter for relevant data where shooting was involved
+shootingData <- crimeData %>% filter(shooting != 'NA')
+head(shootingData, 5)
+```
+```{r}
+# geographical chart using only the shooting data
+qplot(long, lat, data= shootingData, color=district, geom='point', xlim = c(-71.2,-70.95), ylim= c(42.23,42.4))  + theme_bw(base_size=10) + geom_point(size = 1)
+```
+From this new geospatial chart, we can see that the most shootings occured in B2, B3, and C11.
+
+```{r}
+# sorted the shooting data by year to see the distribution
+sort(table(shootingData$year), decreasing = TRUE)
+```
+Since 2017 has the most shooting cases reported in this data set, we will use the year to begin our breakdown
+
+```{r}
+# get summary stats of guns recovered in the year 2017 by the BPD
+firearms2017 <- firearmData%>% filter(grepl("2017", CollectionDate))
+summary(firearms2017)
+
+```
+
+```{r}
+# sum of each
+x<- sum(firearms2017$CrimeGunsRecovered)
+x1<- sum(firearms2017$GunsSurrenderedSafeguarded)
+x2<- sum(firearms2017$BuybackGunsRecovered)
+#Total and mean number of crime guns recovered in 2017
+x
+mean(firearms2017$CrimeGunsRecovered)
+#Total and mean number of guns surrendered in 2017
+x1
+mean(firearms2017$GunsSurrenderedSafeguarded)
+##Total and mean number of buyback guns recovered in 2017
+x2
+mean(firearms2017$BuybackGunsRecovered)
+
+total2017 <- x + x1 + x2
+total2017
+
+```
+```{r}
+# graph the number of shootings spread through the years
+ggplot(data = shootingData, aes(x = year, color = year)) +
+  geom_bar(label = TRUE)+
+  ggtitle("Number of shootings throughout the years")+
+  labs(x = "Years")
+```
+```{r}
+sum(shootingData$year==2017)
+```
+
+This chart confirms what was said by the other data set as well. 2017 was indeed the most violent year with the most shootings and guns confiscated as well so we will use this year to compare statistics.
+
+```{r}
+violentOffenses<- shootingData%>%
+  select(offense_code_group, year)%>%
+  group_by(offense_code_group)%>%
+  summarise(n())
+
+violentOffenses
+
+```
+We can see from this data that the most number of shootings occured during an Aggravated Assault and then the number significantly drops. The next most common offense type for a shooting was Homocide.The third highest gave me a suprise as it was Warrent Arrests. I did not expect that number to be almost as high as homocide but it is 3rd.
+
+
+Since we have determined the specifics, now we will go back to the broader picture and look at this information in reference to the whole dataset.
+```{r}
+#create a column for seasons and store this data in a new variable
+wSeason<- crimeData %>% mutate(Season = ifelse(month %in% c(6,7,8), "Summer",
+                                        ifelse(month %in% c(9,10,11), "Fall",
+                                        ifelse(month %in% c(12,1,2), "Winter",
+                                        "Spring"))))
+table(wSeason$Season)
+
+```
+```{r}
+wSeasonShooting<- shootingData %>% mutate(Season = ifelse(month %in% c(6,7,8), "Summer",
+                                        ifelse(month %in% c(9,10,11), "Fall",
+                                        ifelse(month %in% c(12,1,2), "Winter",
+                                        "Spring"))))
+table(wSeasonShooting$Season)
+```
+
+```{r}
+# graph the number of shootings spread through the years
+ggplot(data = wSeason, aes(x = Season, color= Season)) +
+  geom_bar(label = TRUE)+geom_bar(data = wSeasonShooting, color = 'red')+
+  ggtitle("Number of crimes throughout the years")+
+  labs(x = "Years")
+```
+The red represents the violent crimes while the gray bars are all crimes in total.
+
+
+
+
+
+
+
+## Conclusion
+We found that that the most shootings occured in B2, B3, and C11 which all seemed to be located in central Boston. Of those shootings, most occured in 2017 when compared to the other years in this dataset. We also found that a total of 761 guns were recovered by the BPD in total for the year of 2017. However, the number of crimes reported related to shooting in the same year was only 457. The point of this report was to understand the shootings throughout in Boston in depth and also to determine if the number of guns confiscated was a realistic number in response to the reported crimes. In 2017, despite the concetration of violent crimes in specific districts, it can be concluded that since more guns were confiscated than the number of violent crimes, the BPD has been doing its part in enforcing gun laws.
+
+
+
+
+
+
+
+
